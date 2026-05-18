@@ -4541,6 +4541,282 @@ document.querySelectorAll('nav.tabs button[data-tab="weekly"]').forEach(b => {
   b.addEventListener('click', () => setTimeout(() => { try { renderWeekly(); } catch(e) { console.error('weekly err', e); } }, 50));
 });
 
+
+// ============ EMBARQUES RENDERER ============
+function renderEmbarques() {
+  const E = window.DASH.embarques;
+  if (!E) return;
+  const fmt = n => '$' + Math.round(n||0).toLocaleString('en-US');
+  const fmtCLP = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+  const fmtPct = n => (n*100).toFixed(1) + '%';
+  const today = new Date('2026-05-18');
+
+  // === HERO KPIs ===
+  const t = E.totales;
+  const restante = t.budget_total_usd - t.comprometido_total_usd;
+  const pct_uso = t.comprometido_total_usd / t.budget_total_usd;
+  const heroEl = document.getElementById('kpi-embarques-hero');
+  if (heroEl) {
+    heroEl.innerHTML = `
+      <div class="kpi"><div class="label">Presupuesto total</div>
+        <div class="value">$${t.budget_total_usd.toLocaleString('en-US')}</div>
+        <div class="sub">USD · compras China</div></div>
+      <div class="kpi"><div class="label">Comprometido</div>
+        <div class="value" style="color:${pct_uso<0.8?'#186318':pct_uso<1?'#a07300':'#c0392b'};">${fmt(t.comprometido_total_usd)}</div>
+        <div class="sub">${fmtPct(pct_uso)} · ${fmt(t.comprometido_definido_usd)} DEFINIDO</div></div>
+      <div class="kpi"><div class="label">Restante disponible</div>
+        <div class="value" style="color:${restante>0?'#186318':'#c0392b'};">${fmt(restante)}</div>
+        <div class="sub">${restante>0?'Espacio para más':'Excedido'}</div></div>
+      <div class="kpi"><div class="label">Unidades totales</div>
+        <div class="value">${t.units_total.toLocaleString('es-CL')}</div>
+        <div class="sub">${t.items_new} New · ${t.items_repo} Repo</div></div>
+      <div class="kpi"><div class="label">Items DEFINIDO</div>
+        <div class="value">${t.items_definido}</div>
+        <div class="sub">${t.items_por_definir} POR DEFINIR · listos para producción</div></div>
+      <div class="kpi"><div class="label">Próxima llegada</div>
+        <div class="value" style="font-size:18px;">06-Jul 2026</div>
+        <div class="sub">MCH26133 · Botellas Kids</div></div>
+    `;
+  }
+
+  // Status pill
+  const pill = document.getElementById('embarques-status-pill');
+  if (pill) {
+    pill.textContent = `📦 ${t.items_definido + t.items_por_definir} items · ${fmt(t.comprometido_total_usd)} comprometido`;
+  }
+
+  // === TIMELINE ===
+  const tl = document.getElementById('embarques-timeline');
+  if (tl) {
+    const events = [
+      { date: '2026-05-14', label: '✅ Carga lista', detail: 'Embarque MCH26133 · Botellas Kids', confirmed: true },
+      { date: '2026-05-20', label: '⏳ Cut-off Ningbo', detail: 'Última fecha para cargar contenedor', confirmed: true },
+      { date: '2026-05-26', label: '🚢 ETD Ningbo', detail: 'Embarque MCH26133 zarpa de China', confirmed: true },
+      { date: '2026-07-06', label: '🏭 ETA San Antonio', detail: 'MCH26133 llega a Chile · 4.650 uds Botellas/Tapas/Bases Kids', confirmed: true },
+      { date: '2026-07-11', label: '🏗️ Fin producción Oslo', detail: 'Mochila Oslo Black termina producción en China', confirmed: false },
+      { date: '2026-07-25', label: '🚢 ETD Oslo estimado', detail: '~14 días post-producción (estimado)', confirmed: false },
+      { date: '2026-08-25', label: '🏭 ETA Oslo estimada', detail: '500 uds Mochila Oslo Black', confirmed: false },
+    ];
+    // Sort by date
+    events.sort((a,b) => a.date.localeCompare(b.date));
+    tl.innerHTML = `<div style="position:relative;padding:10px 0;">
+      <div style="position:absolute;left:120px;top:20px;bottom:10px;width:2px;background:#d4a373;"></div>
+      ${events.map(e => {
+        const d = new Date(e.date);
+        const daysFromToday = Math.round((d - today) / (1000*60*60*24));
+        const isPast = daysFromToday < 0;
+        const dayLabel = daysFromToday === 0 ? 'HOY' : daysFromToday > 0 ? `en ${daysFromToday}d` : `hace ${-daysFromToday}d`;
+        const dateStr = d.toLocaleDateString('es-CL', {day:'2-digit', month:'short', year:'numeric'});
+        return `<div style="display:flex;align-items:flex-start;margin-bottom:14px;position:relative;">
+          <div style="width:110px;text-align:right;padding-right:12px;font-size:11px;color:#666;">
+            <div style="font-weight:700;color:#1a1a1a;">${dateStr}</div>
+            <div style="color:${isPast?'#888':'#d4a373'};font-weight:600;">${dayLabel}</div>
+          </div>
+          <div style="width:14px;height:14px;background:${e.confirmed ? '#186318' : '#a07300'};border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px ${e.confirmed?'#186318':'#a07300'};position:relative;z-index:1;flex-shrink:0;margin-top:2px;"></div>
+          <div style="margin-left:14px;flex:1;">
+            <div style="font-weight:700;font-size:14px;color:#1a1a1a;">${e.label}</div>
+            <div style="font-size:12px;color:#555;margin-top:2px;">${e.detail}</div>
+            ${!e.confirmed?'<div style="font-size:10px;color:#a07300;font-style:italic;margin-top:2px;">⚠ Fecha estimada</div>':''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // === BY CATEGORIA ===
+  const catTbody = document.querySelector('#tbl-emb-categoria tbody');
+  if (catTbody) {
+    const cats = Object.entries(E.by_categoria).sort((a,b) => b[1].usd - a[1].usd);
+    catTbody.innerHTML = '';
+    cats.forEach(([cat, v]) => {
+      const pct = v.usd / t.budget_total_usd;
+      catTbody.innerHTML += `<tr>
+        <td class="txt"><strong>${cat}</strong></td>
+        <td>${v.items}</td>
+        <td>${v.qty.toLocaleString('es-CL')}</td>
+        <td>${fmt(v.usd)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="flex:1;background:#eee;height:6px;border-radius:3px;overflow:hidden;">
+              <div style="background:#d4a373;height:100%;width:${(pct*100).toFixed(1)}%;"></div>
+            </div>
+            <span style="font-size:11px;color:#666;min-width:40px;text-align:right;">${fmtPct(pct)}</span>
+          </div>
+        </td>
+      </tr>`;
+    });
+  }
+
+  // === STATUS SUMMARY ===
+  const ssEl = document.getElementById('emb-status-summary');
+  if (ssEl) {
+    const definido_usd = t.comprometido_definido_usd;
+    const pordefinir_usd = t.comprometido_por_definir_usd;
+    const restante = t.budget_total_usd - t.comprometido_total_usd;
+    ssEl.innerHTML = `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span><strong>✅ DEFINIDO</strong> · ${t.items_definido} items</span>
+          <span style="color:#186318;font-weight:700;">${fmt(definido_usd)}</span>
+        </div>
+        <div style="background:#eee;height:12px;border-radius:6px;overflow:hidden;">
+          <div style="background:#186318;height:100%;width:${(definido_usd/t.budget_total_usd*100).toFixed(1)}%;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span><strong>⏳ POR DEFINIR</strong> · ${t.items_por_definir} items</span>
+          <span style="color:#a07300;font-weight:700;">${fmt(pordefinir_usd)}</span>
+        </div>
+        <div style="background:#eee;height:12px;border-radius:6px;overflow:hidden;">
+          <div style="background:#a07300;height:100%;width:${(pordefinir_usd/t.budget_total_usd*100).toFixed(1)}%;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span><strong>💰 RESTANTE</strong></span>
+          <span style="color:${restante>0?'#1a1a1a':'#c0392b'};font-weight:700;">${fmt(restante)}</span>
+        </div>
+        <div style="background:#eee;height:12px;border-radius:6px;overflow:hidden;">
+          <div style="background:#1a1a1a;height:100%;width:${(restante/t.budget_total_usd*100).toFixed(1)}%;"></div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #ddd;padding-top:14px;margin-top:14px;font-size:12px;color:#666;">
+        <div><strong>Resumen por embarque:</strong></div>
+        ${Object.entries(E.by_shipment).map(([sid, v]) => {
+          const ship = E.shipments[sid];
+          const name = ship ? ship.name : sid;
+          const eta = ship?.eta ? ' · ETA ' + ship.eta : '';
+          return `<div style="margin-top:6px;display:flex;justify-content:space-between;">
+            <span>${name}${eta}</span>
+            <span>${v.items} items · ${v.qty.toLocaleString('es-CL')} uds · ${fmt(v.usd)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // === FILTERS para tabla principal ===
+  const cats = [...new Set(E.items.map(i => i.subcategoria))].sort();
+  const catSel = document.getElementById('emb-filter-cat');
+  if (catSel && !catSel._populated) {
+    catSel._populated = true;
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      catSel.appendChild(opt);
+    });
+  }
+  const ships = Object.keys(E.shipments).concat(['POR DEFINIR','OLD']);
+  const shipSel = document.getElementById('emb-filter-shipment');
+  if (shipSel && !shipSel._populated) {
+    shipSel._populated = true;
+    ships.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = E.shipments[s]?.name || s;
+      shipSel.appendChild(opt);
+    });
+  }
+
+  function renderItemsTable() {
+    const sLower = (document.getElementById('emb-search')?.value || '').toLowerCase();
+    const fStatus = document.getElementById('emb-filter-status')?.value || 'all';
+    const fTipo = document.getElementById('emb-filter-tipo')?.value || 'all';
+    const fCat = document.getElementById('emb-filter-cat')?.value || 'all';
+    const fShip = document.getElementById('emb-filter-shipment')?.value || 'all';
+
+    let filtered = E.items.filter(i => {
+      if (sLower && !(i.sku.toLowerCase().includes(sLower) || i.name.toLowerCase().includes(sLower) || i.categoria.toLowerCase().includes(sLower) || i.subcategoria.toLowerCase().includes(sLower))) return false;
+      if (fStatus !== 'all' && i.status !== fStatus) return false;
+      if (fTipo !== 'all' && i.tipo !== fTipo) return false;
+      if (fCat !== 'all' && i.subcategoria !== fCat) return false;
+      if (fShip !== 'all' && i.shipment_id !== fShip) return false;
+      return true;
+    });
+    document.getElementById('emb-count').textContent = `${filtered.length} de ${E.items.length} items`;
+
+    const tipo_badge = t => {
+      if (t === 'New') return '<span style="background:#e3f2fd;color:#0d47a1;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;">🆕 New</span>';
+      if (t === 'Repo') return '<span style="background:#e8f5e9;color:#1b5e20;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;">🔁 Repo</span>';
+      if (t === 'Old') return '<span style="background:#f5f5f5;color:#666;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;">❌ Old</span>';
+      return t;
+    };
+    const status_badge = s => {
+      if (s === 'DEFINIDO') return '<span style="background:#c8e6c9;color:#1b5e20;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;">✅ DEFINIDO</span>';
+      if (s === 'POR DEFINIR') return '<span style="background:#fff3cd;color:#856404;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;">⏳ POR DEFINIR</span>';
+      if (s === 'STAND BY') return '<span style="background:#f5f5f5;color:#666;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;">⏸ STAND BY</span>';
+      return s;
+    };
+
+    const tbody = document.querySelector('#tbl-emb-items tbody');
+    tbody.innerHTML = filtered.map(i => {
+      const ship = E.shipments[i.shipment_id];
+      const shipLabel = ship ? `<strong>${ship.name.replace(/Embarque \d+ · /,'')}</strong>${ship.eta ? '<br><span style="font-size:10px;color:#666;">ETA ' + ship.eta + '</span>' : ''}` : (i.shipment_id === 'POR DEFINIR' ? '<em style="color:#a07300;">Pendiente</em>' : '<em style="color:#888;">—</em>');
+      const skuDisplay = i.sku.startsWith('NEW_') ? '<em style="color:#888;font-size:11px;">NEW</em>' : `<strong>${i.sku}</strong>`;
+      return `<tr>
+        <td class="txt">${skuDisplay}</td>
+        <td class="txt" style="font-size:11px;">${i.name}</td>
+        <td class="txt" style="font-size:11px;color:#666;">${i.subcategoria}</td>
+        <td class="txt">${tipo_badge(i.tipo)}</td>
+        <td class="txt">${status_badge(i.status)}</td>
+        <td>${i.qty.toLocaleString('es-CL')}</td>
+        <td>${i.fob_usd ? '$' + i.fob_usd.toFixed(2) : '–'}</td>
+        <td>${i.cif_usd ? '$' + i.cif_usd.toFixed(2) : '–'}</td>
+        <td>${i.cif_clp ? fmtCLP(i.cif_clp) : '–'}</td>
+        <td style="font-weight:700;">${i.total_usd ? '$' + i.total_usd.toLocaleString('en-US') : '–'}</td>
+        <td class="txt" style="font-size:11px;">${shipLabel}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderItemsTable();
+  ['emb-search','emb-filter-status','emb-filter-tipo','emb-filter-cat','emb-filter-shipment'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._wired) {
+      el._wired = true;
+      el.addEventListener('input', renderItemsTable);
+      el.addEventListener('change', renderItemsTable);
+    }
+  });
+
+  // === NOTAS ===
+  const notasEl = document.getElementById('emb-notas');
+  if (notasEl) notasEl.innerHTML = E.notas_pm.map(n => `<li>${n}</li>`).join('');
+
+  // === IMPACTO STOCK ===
+  // For each SKU in embarques, find current stock & velocity, and compute future coverage
+  const stockFull = window.DASH.stock_full || [];
+  const stockBySku = {};
+  stockFull.forEach(s => stockBySku[s.sku] = s);
+  const impactTbody = document.querySelector('#tbl-emb-impact tbody');
+  if (impactTbody) {
+    const impactItems = E.items.filter(i => !i.sku.startsWith('NEW_') && i.qty > 0 && i.status === 'DEFINIDO');
+    impactTbody.innerHTML = impactItems.map(i => {
+      const s = stockBySku[i.sku];
+      const ship = E.shipments[i.shipment_id];
+      const stock_actual = s ? s.total : 0;
+      const stock_futuro = stock_actual + i.qty;
+      const vel = s ? s.vel_total : 0;
+      const cob_futuro = vel > 0 ? Math.round(stock_futuro/vel * 30) : (stock_futuro > 0 ? 999 : 0);
+      const cob_color = c => c===0 ? '#c0392b' : c<=30 ? '#a07300' : c<=90 ? '#1a1a1a' : '#186318';
+      return `<tr>
+        <td class="txt"><strong>${i.sku}</strong></td>
+        <td class="txt" style="font-size:11px;">${i.name}</td>
+        <td>${vel || '–'}</td>
+        <td>${stock_actual}</td>
+        <td style="color:#1a3a5c;font-weight:700;">+${i.qty}</td>
+        <td style="font-weight:700;">${stock_futuro}</td>
+        <td style="color:${cob_color(cob_futuro)};font-weight:700;">${cob_futuro===999?'∞':cob_futuro+'d'}</td>
+        <td class="txt" style="font-size:11px;">${ship?.eta || '<em style="color:#888;">—</em>'}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { try { renderEmbarques(); } catch(e) { console.error('embarques err', e); } });
+document.querySelectorAll('nav.tabs button[data-tab="embarques"]').forEach(b => {
+  b.addEventListener('click', () => setTimeout(() => { try { renderEmbarques(); } catch(e) { console.error('embarques err', e); } }, 50));
+});
+
 </script>
 </body>
 </html>
